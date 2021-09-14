@@ -16,30 +16,25 @@ def metric_name():
 
 
 def test_ok(client: Metrix, metric_name: str):
-    # GIVEN: start timestamp
-    start_time = time.time()
-
     # WHEN: increment metric 1000 times
     for i in range(1000):
         client.increment(metric_name=metric_name)
 
-    # AND: store timestamp after first increment
-    mid_time = time.time()
+    # AND: sleep for 2 s
+    time.sleep(2)
 
     # AND: increment metric 1000 times
     for i in range(1000):
         client.increment(metric_name=metric_name)
 
-    # THEN: sum from `start_time` should be equal to 2000
-    assert client.sum(metric_name=metric_name, start=start_time) == 2000
+    # THEN: sum with interval=5 should be equal to 2000
+    assert client.sum(metric_name=metric_name, interval=5) == 2000
 
-    # AND: sum from `mid_time` should be equal to 1000 and not include events occured before
-    assert client.sum(metric_name=metric_name, start=mid_time) == 1000
+    # AND: sum with interval=1 should be equal to 1000 and not include events occured before
+    assert client.sum(metric_name=metric_name, interval=1) == 1000
 
 
 def test_multiple_metrics(client: Metrix):
-    start_time = time.time()
-
     # GIVEN: multiple metrics names
     metric_names = ["a", "b", "c", "d"]
 
@@ -49,21 +44,39 @@ def test_multiple_metrics(client: Metrix):
 
     # THEN: sum value for each metric_name should be 1
     for name in metric_names:
-        assert client.sum(metric_name=name, start=start_time) == 1
+        assert client.sum(metric_name=name, interval=5) == 1
+
+
+def test_wrong_metric_name(client: Metrix, metric_name: str):
+    # WHEN: increment counter with `metric_name`
+    client.increment(metric_name)
+
+    # THEN: `sum` for `metric_name` not raises any error and returns 1
+    assert client.sum(metric_name, 5) == 1
+
+    # AND: `sum` raises `ValueError` for not existing metric name
+    with pytest.raises(ValueError):
+        client.sum(metric_name + "a", 5)
 
 
 def test_ttl(metric_name: str):
-    # GIVEN: init client with ttl = 0.5s
-    start_time = time.time()
-    client = Metrix(ttl=0.5)
+    # GIVEN: init client with ttl = 2s
+    client = Metrix(ttl=2)
 
     # WHEN: increment counter
     client.increment(metric_name=metric_name)
 
-    # THEN: counter sum from start_time == 1
-    assert client.sum(metric_name=metric_name, start=start_time) == 1
+    # THEN: count sum with interval 1s == 1
+    assert client.sum(metric_name=metric_name, interval=1) == 1
 
-    # WHEN: sleep 1 sec
-    time.sleep(1)
-    # THEN: counter sum from start_time == 0
-    assert client.sum(metric_name=metric_name, start=start_time) == 0
+    # WHEN: sleep 3s
+    time.sleep(3)
+    # THEN: count sum with interval 1s == 0
+    assert client.sum(metric_name=metric_name, interval=1) == 0
+
+    # WHEN: do two more increments
+    client.increment(metric_name=metric_name)
+    client.increment(metric_name=metric_name)
+
+    # THEN: count sum with any interval == 2
+    assert client.sum(metric_name=metric_name, interval=100) == 2
