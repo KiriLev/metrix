@@ -30,7 +30,7 @@ def test_ok(client: Metrix, metric_name: str):
     # THEN: sum with interval=5 should be equal to 2000
     assert client.sum(metric_name=metric_name, interval=5) == 2000
 
-    # AND: sum with interval=1 should be equal to 1000 and not include events occured before
+    # AND: sum with interval=1 should be equal to 1000 and not include events occurred before
     assert client.sum(metric_name=metric_name, interval=1) == 1000
 
 
@@ -51,12 +51,11 @@ def test_wrong_metric_name(client: Metrix, metric_name: str):
     # WHEN: increment counter with `metric_name`
     client.increment(metric_name)
 
-    # THEN: `sum` for `metric_name` not raises any error and returns 1
+    # THEN: `sum` for `metric_name` returns 1
     assert client.sum(metric_name, 5) == 1
 
-    # AND: `sum` raises `ValueError` for not existing metric name
-    with pytest.raises(ValueError):
-        client.sum(metric_name + "a", 5)
+    # AND: `sum` for not existing metric name returns 0
+    assert client.sum(metric_name + "a", 5) == 0
 
 
 def test_ttl(metric_name: str):
@@ -74,9 +73,29 @@ def test_ttl(metric_name: str):
     # THEN: count sum with interval 1s == 0
     assert client.sum(metric_name=metric_name, interval=1) == 0
 
-    # WHEN: do two more increments
-    client.increment(metric_name=metric_name)
+    # WHEN: do increment one more time
     client.increment(metric_name=metric_name)
 
-    # THEN: count sum with any interval == 2
-    assert client.sum(metric_name=metric_name, interval=100) == 2
+    # THEN: count sum with interval = 1s == 1
+    assert client.sum(metric_name=metric_name, interval=1) == 1
+
+
+def test_interval_greater_than_ttl(metric_name: str):
+    # GIVEN: init client with ttl = 2s
+    client = Metrix(ttl=2)
+
+    # WHEN: increment counter
+    client.increment(metric_name=metric_name)
+
+    # THEN: `sum` for interval == ttl not raises any error and returns 1
+    assert client.sum(metric_name, 2) == 1
+
+    # AND: `sum` for interval > ttl not raises any error and returns 1
+    assert client.sum(metric_name, 10) == 1
+
+
+def test_ttl_zero():
+    # THEN: init with ttl <= 0s causes error
+    with pytest.raises(ValueError):
+        Metrix(ttl=0)
+        Metrix(ttl=-5)
